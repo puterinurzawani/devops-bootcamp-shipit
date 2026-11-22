@@ -1,9 +1,7 @@
 name: deploy
 on:
-  push:
-    branches: [main]
   pull_request:
-  workflow_dispatch:
+    types: [opened, synchronize, reopened, closed]
 permissions:
   contents: read
   pages: write
@@ -16,6 +14,7 @@ defaults:
     working-directory: launchpad
 jobs:
   test:
+    if: github.event.pull_request.merged == false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -23,12 +22,12 @@ jobs:
       - run: npm clean-install
       - run: npm run test
       - run: bash scripts/report.sh
-        continue-on-error: true
         env:
           BOARD_URL: ${{ vars.BOARD_URL }}
           SHIPIT_TOKEN: ${{ secrets.SHIPIT_TOKEN }}
   build:
     needs: test
+    if: always() && github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -41,8 +40,8 @@ jobs:
         with:
           path: launchpad/dist
   deploy:
-    if: github.event_name != 'pull_request'
     needs: build
+    if: always() && needs.build.result == 'success'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -50,4 +49,3 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@v5
- 
